@@ -1,45 +1,45 @@
 # aw-manager
 
-Chat gateway for [aw](https://github.com/konono/aw) — run AI coding agents on Kubernetes from Slack or Discord.
+[aw](https://github.com/konono/aw) のチャットゲートウェイ — Slack や Discord から Kubernetes 上の AI コーディングエージェントを操作します。
 
 ```
 Discord/Slack  →  aw-manager  →  K8s Pod (claude/codex/opencode/cursor)
 ```
 
-Users send messages in chat. aw-manager creates an agent Pod per user+channel, executes the AI tool, and replies with the result.
+ユーザーがチャットでメッセージを送ると、aw-manager がユーザー+チャンネルごとにエージェント Pod を作成し、AI ツールを実行して結果を返信します。
 
-## Quick Start
+## クイックスタート
 
-### Prerequisites
+### 前提条件
 
 - Go 1.25+
-- Kubernetes cluster (OpenShift supported)
+- Kubernetes クラスタ（OpenShift 対応）
 - Redis
-- Discord or Slack bot token
-- [aw](https://github.com/konono/aw) binary (for `aw manifest`)
-- `.aw.yml` with a K8s profile (e.g., `k8s-claude`)
+- Discord または Slack の Bot トークン
+- [aw](https://github.com/konono/aw) バイナリ（`aw manifest` 用）
+- K8s プロファイルを含む `.aw.yml`（例: `k8s-claude`）
 
-### Local Development
+### ローカル開発
 
 ```bash
-# 1. Copy and edit config
+# 1. 設定ファイルをコピーして編集
 cp .env.example .env
 vi .env
 
-# 2. Start Redis
+# 2. Redis を起動
 podman run -d --name aw-redis -p 6379:6379 redis:7-alpine
 
-# 3. Run
+# 3. 実行
 ./aw-manager serve
 ```
 
-### Deploy to Kubernetes
+### Kubernetes へのデプロイ
 
 ```bash
-# Build and push image
+# イメージをビルドして push
 ./aw-manager build --push --registry ghcr.io/yourorg
 
-# Deploy (secrets are auto-extracted from .aw.yml)
+# デプロイ（secrets は .aw.yml から自動抽出）
 ./aw-manager deploy \
   --adapter discord \
   --discord-token "your-token" \
@@ -47,97 +47,97 @@ podman run -d --name aw-redis -p 6379:6379 redis:7-alpine
   --aw-config .aw.yml
 ```
 
-This creates everything in one command: namespaces, RBAC, Redis, secrets, and the aw-manager Deployment.
+このコマンド1つで Namespace、RBAC、Redis、Secret、aw-manager Deployment がすべて作成されます。
 
-## Configuration
+## 設定
 
-All settings can be provided via CLI flags, environment variables, or a `.env` file. Run `aw-manager serve --help` for the full list.
+すべての設定は CLI フラグ、環境変数、`.env` ファイルのいずれかで指定できます。`aw-manager serve --help` で全項目を確認できます。
 
-| Setting | Env Var | Default | Description |
+| 設定 | 環境変数 | デフォルト | 説明 |
 |---|---|---|---|
-| `--adapter` | `CHAT_ADAPTER` | `slack` | Chat platform (`slack` or `discord`) |
-| `--slack-bot-token` | `SLACK_BOT_TOKEN` | | Slack bot token |
-| `--slack-app-token` | `SLACK_APP_TOKEN` | | Slack app token (Socket Mode) |
-| `--discord-token` | `DISCORD_TOKEN` | | Discord bot token |
-| `--redis-url` | `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
-| `--aw-profile` | `AW_PROFILE` | `claude-k8s` | aw profile for agent pods |
-| `--aw-namespace` | `AW_NAMESPACE` | `aw` | Namespace for agent pods |
-| `--aw-binary` | `AW_BINARY` | `aw` | Path to aw binary |
-| `--aw-tool` | `AW_TOOL` | `claude` | AI tool (`claude`, `codex`, `opencode`, `cursor`) |
-| `--idle-timeout` | `IDLE_TIMEOUT` | `1h` | Idle timeout before agent pods are cleaned up |
-| `--max-concurrent` | `MAX_CONCURRENT` | `10` | Maximum concurrent message handlers |
-| `--metrics-addr` | `METRICS_ADDR` | `:9090` | Prometheus metrics endpoint |
+| `--adapter` | `CHAT_ADAPTER` | `slack` | チャットプラットフォーム（`slack` or `discord`） |
+| `--slack-bot-token` | `SLACK_BOT_TOKEN` | | Slack Bot トークン |
+| `--slack-app-token` | `SLACK_APP_TOKEN` | | Slack App トークン（Socket Mode） |
+| `--discord-token` | `DISCORD_TOKEN` | | Discord Bot トークン |
+| `--redis-url` | `REDIS_URL` | `redis://localhost:6379` | Redis 接続 URL |
+| `--aw-profile` | `AW_PROFILE` | `claude-k8s` | エージェント Pod の aw プロファイル |
+| `--aw-namespace` | `AW_NAMESPACE` | `aw` | エージェント Pod の Namespace |
+| `--aw-binary` | `AW_BINARY` | `aw` | aw バイナリのパス |
+| `--aw-tool` | `AW_TOOL` | `claude` | AI ツール（`claude`, `codex`, `opencode`, `cursor`） |
+| `--idle-timeout` | `IDLE_TIMEOUT` | `1h` | エージェント Pod のアイドルタイムアウト |
+| `--max-concurrent` | `MAX_CONCURRENT` | `10` | 同時メッセージ処理の上限 |
+| `--metrics-addr` | `METRICS_ADDR` | `:9090` | Prometheus メトリクスエンドポイント |
 
-## Architecture
+## アーキテクチャ
 
-### Session Model
+### セッションモデル
 
-Each **user + channel** pair gets a dedicated Pod. Messages in the same channel reuse the same Pod and continue the AI session with `--continue`. Different channels get separate Pods with isolated sessions.
+**ユーザー + チャンネル** の組み合わせごとに専用の Pod が割り当てられます。同じチャンネル内のメッセージは同じ Pod を再利用し、`--continue` で AI セッションを継続します。異なるチャンネルでは別の Pod が作成され、セッションは分離されます。
 
-### How It Works
+### 動作フロー
 
-1. Chat message received via Socket Mode (Slack) or WebSocket (Discord)
-2. `aw manifest <profile> --name <hash>` generates K8s manifests (Deployment, ConfigMap, Secret, etc.)
-3. Manifests applied via Server-Side Apply (client-go dynamic client)
-4. Wait for Pod Ready
-5. Execute AI tool via `kubectl exec` with message piped through stdin
-6. Response sent back to chat
+1. Socket Mode（Slack）または WebSocket（Discord）でチャットメッセージを受信
+2. `aw manifest <profile> --name <hash>` で K8s マニフェスト（Deployment, ConfigMap, Secret 等）を生成
+3. Server-Side Apply（client-go dynamic client）でマニフェストを適用
+4. Pod が Ready になるまで待機
+5. `kubectl exec` 相当でメッセージを stdin 経由で AI ツールに渡して実行
+6. 応答をチャットに返信
 
-### Pod Lifecycle
+### Pod ライフサイクル
 
-- **Creation**: On first message per user+channel
-- **Reuse**: Subsequent messages in the same channel reuse the existing Pod
-- **Idle cleanup**: Pods idle longer than `--idle-timeout` are automatically deleted (5-minute check interval)
-- **Orphan cleanup**: Pods without a Redis session (e.g., after Redis restart) are cleaned up with safety guards
-- **Unhealthy recovery**: CrashLoopBackOff / ImagePullBackOff pods are deleted and recreated on next message
+- **作成**: ユーザー+チャンネルの初回メッセージ時
+- **再利用**: 同一チャンネルの後続メッセージで既存 Pod を再利用
+- **アイドル回収**: `--idle-timeout` を超えてアイドル状態の Pod を自動削除（5分間隔のチェック）
+- **Orphan 回収**: Redis にセッションがない Pod（Redis 再起動後など）を安全装置付きでクリーンアップ
+- **異常回復**: CrashLoopBackOff / ImagePullBackOff の Pod は削除され、次回メッセージで再作成
 
-### Concurrency
+### 並行制御
 
-- Per-session mutex serializes EnsurePod + ExecTool for the same user+channel
-- Global semaphore limits concurrent handlers (default: 10)
-- Excess messages get an immediate "server busy" response
+- セッション単位の mutex で EnsurePod + ExecTool を直列化（同一ユーザー+チャンネル）
+- グローバル semaphore で同時ハンドラ数を制限（デフォルト: 10）
+- 上限超過時はブロックせず即座に「サーバーが混雑しています」と返信
 
-## Supported Tools
+## 対応ツール
 
-| Tool | Binary | Session Continue |
+| ツール | バイナリ | セッション継続 |
 |---|---|---|
-| Claude Code | `claude` | `--continue` |
-| Cursor | `agent` | `--continue` |
-| Codex | `codex` | Not supported |
-| OpenCode | `opencode` | Not supported |
+| Claude Code | `claude` | `--continue` 対応 |
+| Cursor | `agent` | `--continue` 対応 |
+| Codex | `codex` | 非対応 |
+| OpenCode | `opencode` | 非対応 |
 
-## Observability
+## 可観測性
 
-### Prometheus Metrics
+### Prometheus メトリクス
 
-| Metric | Type | Description |
+| メトリクス | 型 | 説明 |
 |---|---|---|
-| `aw_agent_pods_active` | Gauge | Currently active agent pods (synced from K8s) |
-| `aw_agent_exec_duration_seconds` | Histogram | Exec operation duration |
-| `aw_agent_exec_total` | Counter | Exec operations by status (`success`/`error`) |
-| `aw_agent_pod_create_duration_seconds` | Histogram | Pod creation to Ready duration |
-| `aw_agent_messages_total` | Counter | Received messages by adapter |
-| `aw_agent_messages_rejected_total` | Counter | Messages rejected due to concurrency limit |
+| `aw_agent_pods_active` | Gauge | 現在アクティブなエージェント Pod 数（K8s から同期） |
+| `aw_agent_exec_duration_seconds` | Histogram | exec 実行時間 |
+| `aw_agent_exec_total` | Counter | exec 実行回数（`success`/`error` ラベル） |
+| `aw_agent_pod_create_duration_seconds` | Histogram | Pod 作成〜Ready の時間 |
+| `aw_agent_messages_total` | Counter | 受信メッセージ数（adapter ラベル） |
+| `aw_agent_messages_rejected_total` | Counter | 並行上限による拒否数 |
 
-### Health Check
+### ヘルスチェック
 
-`GET /healthz` — Returns `200 ok` if Redis is reachable, `503 unavailable` otherwise.
+`GET /healthz` — Redis 接続可能なら `200 ok`、不可なら `503 unavailable` を返します。
 
-## Production Notes
+## 本番運用の注意事項
 
-- **Single replica only** — aw-manager must run as `replicas: 1`. Socket Mode delivers events to all instances, causing duplicate processing.
-- **External Redis recommended** — The built-in Redis has no persistence. Use `--redis-url` to point to a managed Redis for production.
-- **Network policy** — `/metrics` and `/healthz` are unauthenticated. Restrict access with a NetworkPolicy.
-- **Access control** — Any user who can mention the bot can create agent Pods. Use Slack/Discord channel permissions to control access.
+- **単一レプリカ必須** — aw-manager は `replicas: 1` でのみ正しく動作します。Socket Mode は全インスタンスにイベントを配信するため、複数レプリカでは二重処理が発生します。
+- **外部 Redis 推奨** — 組み込み Redis は永続化なしです。本番では `--redis-url` で外部の Redis を指定してください。
+- **ネットワークポリシー** — `/metrics` と `/healthz` は認証なしで公開されます。NetworkPolicy でアクセスを制限してください。
+- **アクセス制御** — Bot にメンションできるユーザーなら誰でもエージェント Pod を作成できます。Slack/Discord のチャンネル権限で制御してください。
 
-## Commands
+## コマンド
 
 ```
-aw-manager serve    Start the server (default)
-aw-manager deploy   Deploy to Kubernetes
-aw-manager build    Build the container image locally
+aw-manager serve    サーバーを起動（デフォルト）
+aw-manager deploy   Kubernetes にデプロイ
+aw-manager build    コンテナイメージをローカルビルド
 ```
 
-## License
+## ライセンス
 
 MIT
