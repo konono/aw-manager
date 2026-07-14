@@ -7,8 +7,9 @@ type CLI struct {
 	Version kong.VersionFlag `name:"version" help:"Show version."`
 
 	Serve  ServeCmd  `cmd:"" default:"withargs" help:"Start the server (default command)."`
-	Deploy DeployCmd `cmd:"" help:"Deploy aw-manager to a Kubernetes cluster."`
-	Build  BuildCmd  `cmd:"" help:"Build the container image locally."`
+	Deploy   DeployCmd   `cmd:"" help:"Deploy aw-manager to a Kubernetes cluster."`
+	Undeploy UndeployCmd `cmd:"" help:"Remove aw-manager and agent pods from Kubernetes."`
+	Build    BuildCmd    `cmd:"" help:"Build the container image locally."`
 }
 
 // ServeCmd starts the chat bot server.
@@ -45,6 +46,13 @@ type DeployCmd struct {
 	AwConfig      string            `name:"aw-config" env:"AW_CONFIG" help:"Path to .aw.yml to mount in the server pod." type:"existingfile"`
 	Env           map[string]string `name:"env" help:"Extra env vars to pass to the server pod (KEY=VAL, repeatable)."`
 	SecretFiles   []string          `name:"secret-file" help:"Mount a host file as a secret (src:mountPath[:ENV_VAR], repeatable)."`
+}
+
+// UndeployCmd removes aw-manager and all agent resources from Kubernetes.
+type UndeployCmd struct {
+	AwNamespace string `name:"aw-namespace" env:"AW_NAMESPACE" help:"Namespace for agent pods." default:"aw"`
+	Namespace   string `name:"namespace" env:"AW_SYSTEM_NAMESPACE" help:"Namespace for aw-manager itself." default:"aw-system"`
+	All         bool   `name:"all" help:"Also delete the namespaces themselves."`
 }
 
 // BuildCmd builds the container image locally.
