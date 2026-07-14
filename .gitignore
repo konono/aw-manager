@@ -3,3 +3,4 @@ aw-manager
 .env
 .kube/
 deploy/secret.yaml
+aw-agent-server
