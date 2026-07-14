@@ -60,11 +60,11 @@ func (h *Handler) Handle(ctx context.Context, msg Message, respond Responder) {
 	default:
 		metrics.MessagesRejected.Inc()
 		h.logger.Warn("concurrent handler limit reached", "user", msg.UserID, "channel", msg.Channel)
-		respond.SendError(ctx, "The server is currently busy. Please try again in a moment.")
+		_ = respond.SendError(ctx, "The server is currently busy. Please try again in a moment.")
 		return
 	}
 
-	respond.SendTyping(ctx)
+	_ = respond.SendTyping(ctx)
 
 	key := session.SessionKey{
 		UserID:    msg.UserID,
@@ -79,7 +79,7 @@ func (h *Handler) Handle(ctx context.Context, msg Message, respond Responder) {
 	podName, reused, err := h.podManager.EnsurePod(ctx, key)
 	if err != nil {
 		h.logger.Error("failed to ensure pod", "user", msg.UserID, "channel", msg.Channel, "error", err)
-		respond.SendError(ctx, "Failed to prepare the agent. Please try again later.")
+		_ = respond.SendError(ctx, "Failed to prepare the agent. Please try again later.")
 		return
 	}
 	if !reused {
@@ -107,7 +107,7 @@ func (h *Handler) Handle(ctx context.Context, msg Message, respond Responder) {
 			_ = h.podManager.DeleteInstance(ctx, key)
 		}
 
-		respond.SendError(ctx, "The agent encountered an error. Please try again.")
+		_ = respond.SendError(ctx, "The agent encountered an error. Please try again.")
 		return
 	}
 	metrics.ExecTotal.WithLabelValues("success").Inc()
