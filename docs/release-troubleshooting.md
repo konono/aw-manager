@@ -109,6 +109,112 @@ gh pr create --base main --head release-please--branches--main \
 
 PR マージ後は release-please が引き継ぐ（ブランチの**更新**のみで動作）。
 
+ただし Fine-grained token では `git/trees` API もブロックされるため、release-please が PR のコミットを更新する際にも失敗する場合がある。その場合は **解決策 D**（手動リリース）に進む。
+
+#### D. 完全手動リリース（Fine-grained token で解決できない場合の最終手段）
+
+release-please の `git/trees` API 制限を完全に回避し、手動でリリースの全工程を行う。
+
+```bash
+# 1. release-please ブランチを作成（gh CLI は gho_ トークンで権限あり）
+SHA=$(gh api /repos/owner/repo/git/refs/heads/main --jq '.object.sha')
+gh api --method POST /repos/owner/repo/git/refs \
+  -f ref="refs/heads/release-please--branches--main" \
+  -f sha="$SHA"
+
+# 2. ブランチをチェックアウトしてバージョンを更新
+git fetch origin release-please--branches--main
+git checkout release-please--branches--main
+git reset --hard origin/main
+
+# version.go を更新
+# x-release-please-start-version の行を新バージョンに変更
+vi internal/version/version.go
+
+# .release-please-manifest.json を更新
+vi .release-please-manifest.json
+
+# CHANGELOG.md を作成
+cat > CHANGELOG.md << 'EOF'
+# Changelog
+
+## [X.Y.Z](https://github.com/owner/repo/compare/vA.B.C...vX.Y.Z) (YYYY-MM-DD)
+
+### Features
+* feature description (commit hash)
+
+### Bug Fixes
+* fix description (commit hash)
+EOF
+
+# コミットして push
+git add -A
+git commit -m "chore(main): release X.Y.Z"
+git push --force origin release-please--branches--main
+
+# 3. PR を作成
+gh pr create --base main --head release-please--branches--main \
+  --title "chore(main): release X.Y.Z" \
+  --body "## [X.Y.Z] - Release notes here"
+
+# 4. PR をマージ（GitHub UI またはコマンド）
+gh pr merge --squash
+
+# 5. タグと GitHub Release を手動作成
+git checkout main && git pull
+MERGE_SHA=$(git rev-parse HEAD)
+gh api --method POST /repos/owner/repo/git/refs \
+  -f ref="refs/tags/vX.Y.Z" \
+  -f sha="$MERGE_SHA"
+
+gh release create vX.Y.Z \
+  --title "vX.Y.Z" \
+  --notes "Release notes here"
+
+# 6. タグ push で goreleaser + publish-image が自動トリガーされる
+#    （workflow が tag push をトリガーに設定している場合）
+#    トリガーされない場合は、タグを削除して再作成:
+gh api --method DELETE /repos/owner/repo/git/refs/tags/vX.Y.Z
+git tag -f vX.Y.Z
+git push origin vX.Y.Z
+```
+
+### トークン権限の検証方法
+
+問題がトークンの権限なのかを特定するために、API を直接テストする:
+
+```bash
+# トークンの値を変数に設定
+export TEST_TOKEN="github_pat_xxxx"
+
+# git/refs (ブランチ作成) をテスト
+SHA=$(curl -s -H "Authorization: token $TEST_TOKEN" \
+  https://api.github.com/repos/owner/repo/git/refs/heads/main \
+  | grep -o '"sha": "[^"]*"' | head -1 | cut -d'"' -f4)
+
+curl -s -X POST \
+  -H "Authorization: token $TEST_TOKEN" \
+  -d "{\"ref\":\"refs/heads/test-token\",\"sha\":\"$SHA\"}" \
+  https://api.github.com/repos/owner/repo/git/refs
+
+# 成功すれば ref が返る。403 なら権限不足。
+
+# テストブランチを削除
+curl -s -X DELETE \
+  -H "Authorization: token $TEST_TOKEN" \
+  https://api.github.com/repos/owner/repo/git/refs/heads/test-token
+
+# git/trees (ツリー作成) をテスト
+curl -s -X POST \
+  -H "Authorization: token $TEST_TOKEN" \
+  -d "{\"base_tree\":\"$SHA\",\"tree\":[{\"path\":\"test.txt\",\"mode\":\"100644\",\"type\":\"blob\",\"content\":\"test\"}]}" \
+  https://api.github.com/repos/owner/repo/git/trees
+
+# 成功すれば tree が返る。403 なら Fine-grained token の制限。
+```
+
+両方 403 → Classic PAT が必要。`git/refs` のみ 403 → 手動ブランチ作成（解決策 C）で回避可能。両方 403 → 完全手動リリース（解決策 D）。
+
 ## 問題2: `RELEASE_PLEASE_TOKEN` が `Input required and not supplied`
 
 ### 症状
