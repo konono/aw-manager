@@ -53,17 +53,24 @@ func (h *Handler) Handle(ctx context.Context, msg Message, respond Responder) {
 		"isThread", msg.IsThread,
 	)
 
+	// Check for /commands before semaphore — commands are lightweight
+	if h.handleCommand(ctx, msg, respond) {
+		return
+	}
+
 	// Limit concurrent handlers to prevent resource exhaustion
 	select {
 	case h.sem <- struct{}{}:
 		defer func() { <-h.sem }()
 	default:
 		metrics.MessagesRejected.Inc()
+		Stats.MessagesRejected.Add(1)
 		h.logger.Warn("concurrent handler limit reached", "user", msg.UserID, "channel", msg.Channel)
 		_ = respond.SendError(ctx, "The server is currently busy. Please try again in a moment.")
 		return
 	}
 
+	Stats.MessagesHandled.Add(1)
 	_ = respond.SendTyping(ctx)
 
 	key := session.SessionKey{
