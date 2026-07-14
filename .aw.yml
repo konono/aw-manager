@@ -1,0 +1,109 @@
+# aw test profiles — used by `aw -- <cmd>` manual testing
+# These profiles verify tool installation across all OS templates and package managers.
+
+profiles:
+  # ── apt mode (default): 4 OS × 4 tools + shell ──────────────────
+  test-debian12-shell:
+    os: debian12
+    launch: shell
+  test-debian12-claude:
+    os: debian12
+    launch: claude
+  test-debian12-codex:
+    os: debian12
+    launch: codex
+  test-debian12-opencode:
+    os: debian12
+    launch: opencode
+  test-debian12-cursor:
+    os: debian12
+    launch: cursor
+  test-ubi9-claude:
+    os: ubi9
+    launch: claude
+  test-ubi9-codex:
+    os: ubi9
+    launch: codex
+  test-ubi9-opencode:
+    os: ubi9
+    launch: opencode
+  test-ubi9-cursor:
+    os: ubi9
+    launch: cursor
+  test-ubi10-claude:
+    os: ubi10
+    launch: claude
+  test-ubi10-codex:
+    os: ubi10
+    launch: codex
+  test-ubi10-opencode:
+    os: ubi10
+    launch: opencode
+  test-ubi10-cursor:
+    os: ubi10
+    launch: cursor
+  test-ubuntu2604-claude:
+    os: ubuntu2604
+    launch: claude
+  test-ubuntu2604-codex:
+    os: ubuntu2604
+    launch: codex
+  test-ubuntu2604-opencode:
+    os: ubuntu2604
+    launch: opencode
+  test-ubuntu2604-cursor:
+    os: ubuntu2604
+    launch: cursor
+  # ── devbox mode (deprecated) ────────────────────────────────────
+  test-devbox-claude:
+    os: debian12
+    launch: claude
+    package_manager: devbox
+
+  # ── development profile ──────────────────────────────────────────
+  dev:
+    launch: claude
+    gh_token: false
+    mount_container_sock: true
+    mount_gh: true
+
+  claude-dev:
+    os: debian12
+    launch: claude
+
+  cursor-review:
+    os: debian12
+    launch: cursor
+
+  # ── Kubernetes manifest profiles ──────────────────────────────────
+  k8s-claude:
+    os: ubi9
+    launch: claude
+    environment: container
+    gh_token: true
+    kubernetes:
+      mode: chat
+      namespace: aw
+      secrets:
+        env:
+          - CLAUDE_CODE_USE_VERTEX
+          - ANTHROPIC_VERTEX_PROJECT_ID
+          - CLOUD_ML_PROJECT_ID
+          - GCP_PROJECT_ID
+          - ANTHROPIC_VERTEX_REGION=us-east5
+          - CLOUD_ML_REGION
+          - GCP_REGION
+        files:
+          - source: ~/.config/gcloud/application_default_credentials.json
+            mountPath: /run/secrets/aw/gcloud/application_default_credentials.json
+            env: GOOGLE_APPLICATION_CREDENTIALS
+
+teams:
+  review-team:
+    members:
+      - profile: claude-dev
+        role: developer
+        foreground: true
+      - profile: cursor-review
+        role: reviewer
+

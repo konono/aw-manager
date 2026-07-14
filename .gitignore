@@ -1,0 +1,5 @@
+aw-manager
+*.exe
+.env
+.kube/
+deploy/secret.yaml

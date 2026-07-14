@@ -1,0 +1,63 @@
+# Reference manifest for manual deployment.
+# For production use, prefer `aw-manager deploy` which generates manifests
+# with correct secrets, volumes, and adapter-specific configuration.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aw-manager
+  namespace: aw-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aw-manager
+  template:
+    metadata:
+      labels:
+        app: aw-manager
+    spec:
+      serviceAccountName: aw-manager
+      containers:
+        - name: server
+          image: ghcr.io/konono/aw-manager:latest
+          env:
+            - name: SLACK_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: aw-manager-slack
+                  key: SLACK_BOT_TOKEN
+            - name: SLACK_APP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: aw-manager-slack
+                  key: SLACK_APP_TOKEN
+            - name: REDIS_URL
+              value: "redis://redis:6379"
+            - name: AW_PROFILE
+              value: "claude-k8s"
+            - name: AW_NAMESPACE
+              value: "aw"
+            - name: IDLE_TIMEOUT
+              value: "1h"
+          ports:
+            - name: metrics
+              containerPort: 9090
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 3
+            periodSeconds: 10
