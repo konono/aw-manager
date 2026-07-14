@@ -35,11 +35,6 @@ func TestSplitMessage_MultiByte(t *testing.T) {
 	msg := strings.Repeat("あ", 200) // 3 bytes each = 600 bytes
 	chunks := SplitMessage(msg, 100)
 	for i, chunk := range chunks {
-		for j := 0; j < len(chunk); j++ {
-			if chunk[j]&0xC0 == 0x80 && (j == 0 || chunk[j-1]&0xC0 != 0xC0 && chunk[j-1]&0xE0 != 0xE0 && chunk[j-1]&0xF0 != 0xF0) {
-				// simplified: just check it's valid UTF-8
-			}
-		}
 		if !isValidUTF8(chunk) {
 			t.Errorf("chunk %d is invalid UTF-8", i)
 		}

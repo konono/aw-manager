@@ -36,7 +36,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*Server, error) {
 
 	podManager, err := pod.NewManager(cfg, sessions, logger)
 	if err != nil {
-		sessions.Close()
+		_ = sessions.Close()
 		return nil, err
 	}
 
@@ -44,7 +44,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*Server, error) {
 
 	adapter, err := buildAdapter(cfg, logger)
 	if err != nil {
-		sessions.Close()
+		_ = sessions.Close()
 		return nil, fmt.Errorf("creating chat adapter: %w", err)
 	}
 
@@ -77,11 +77,11 @@ func (s *Server) Run(ctx context.Context) error {
 		if err := s.sessions.Ping(r.Context()); err != nil {
 			s.logger.Warn("healthz: redis ping failed", "error", err)
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte("unavailable"))
+			_, _ = w.Write([]byte("unavailable"))
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	})
 
 	metricsServer := &http.Server{
@@ -103,8 +103,8 @@ func (s *Server) Run(ctx context.Context) error {
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
-	metricsServer.Shutdown(shutdownCtx)
-	s.sessions.Close()
+	_ = metricsServer.Shutdown(shutdownCtx)
+	_ = s.sessions.Close()
 
 	return err
 }
