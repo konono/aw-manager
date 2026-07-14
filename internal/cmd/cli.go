@@ -8,7 +8,7 @@ type CLI struct {
 
 	Serve  ServeCmd  `cmd:"" default:"withargs" help:"Start the server (default command)."`
 	Deploy   DeployCmd   `cmd:"" help:"Deploy aw-manager to a Kubernetes cluster."`
-	Undeploy UndeployCmd `cmd:"" help:"Remove aw-manager and agent pods from Kubernetes."`
+	Cleanup CleanupCmd `cmd:"" help:"Remove aw-manager and agent pods from Kubernetes."`
 	Build    BuildCmd    `cmd:"" help:"Build the container image locally."`
 }
 
@@ -48,8 +48,8 @@ type DeployCmd struct {
 	SecretFiles   []string          `name:"secret-file" help:"Mount a host file as a secret (src:mountPath[:ENV_VAR], repeatable)."`
 }
 
-// UndeployCmd removes aw-manager and all agent resources from Kubernetes.
-type UndeployCmd struct {
+// CleanupCmd removes aw-manager and all agent resources from Kubernetes.
+type CleanupCmd struct {
 	AwNamespace string `name:"aw-namespace" env:"AW_NAMESPACE" help:"Namespace for agent pods." default:"aw"`
 	Namespace   string `name:"namespace" env:"AW_SYSTEM_NAMESPACE" help:"Namespace for aw-manager itself." default:"aw-system"`
 	All         bool   `name:"all" help:"Also delete the namespaces themselves."`

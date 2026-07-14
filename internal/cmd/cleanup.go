@@ -15,7 +15,7 @@ import (
 )
 
 // Run removes aw-manager and all agent resources from Kubernetes.
-func (u *UndeployCmd) Run() error {
+func (u *CleanupCmd) Run() error {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
@@ -66,7 +66,7 @@ func (u *UndeployCmd) Run() error {
 		}
 	}
 
-	logger.Info("undeploy complete")
+	logger.Info("cleanup complete")
 	return nil
 }
 
