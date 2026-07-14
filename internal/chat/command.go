@@ -19,7 +19,7 @@ var Stats struct {
 // handleCommand processes a /command message. Returns true if it was a command.
 // Works with both Slack and Discord — commands are detected by message prefix.
 func (h *Handler) handleCommand(ctx context.Context, msg Message, respond Responder) bool {
-	if !strings.HasPrefix(msg.Text, "/") {
+	if !strings.HasPrefix(msg.Text, "!") {
 		return false
 	}
 
@@ -27,13 +27,13 @@ func (h *Handler) handleCommand(ctx context.Context, msg Message, respond Respon
 	cmd := strings.ToLower(parts[0])
 
 	switch cmd {
-	case "/clear":
+	case "!clear":
 		h.cmdClear(ctx, msg, respond)
-	case "/status":
+	case "!status":
 		h.cmdStatus(ctx, msg, respond)
-	case "/stats":
+	case "!stats":
 		h.cmdStats(ctx, respond)
-	case "/help":
+	case "!help":
 		h.cmdHelp(ctx, respond)
 	default:
 		return false
@@ -112,10 +112,10 @@ func (h *Handler) cmdStats(ctx context.Context, respond Responder) {
 func (h *Handler) cmdHelp(ctx context.Context, respond Responder) {
 	text := "```\n" +
 		"Available commands:\n" +
-		"  /status  — Show current session and pod info\n" +
-		"  /clear   — Delete the agent pod and start fresh\n" +
-		"  /stats   — Show server statistics\n" +
-		"  /help    — Show this help\n" +
+		"  !status  — Show current session and pod info\n" +
+		"  !clear   — Delete the agent pod and start fresh\n" +
+		"  !stats   — Show server statistics\n" +
+		"  !help    — Show this help\n" +
 		"```"
 	_ = respond.Send(ctx, text)
 }
