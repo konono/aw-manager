@@ -281,7 +281,42 @@ publish-image:
   timeout-minutes: 30  # 15 → 30
 ```
 
-## 問題5: push したイメージが K8s から pull できない
+## 問題5: publish-image が `permission_denied: write_package` で失敗
+
+### 症状
+
+```
+ERROR: failed to push ghcr.io/owner/repo:tag: denied: permission_denied: write_package
+```
+
+### 原因
+
+ghcr.io のパッケージが**リポジトリにリンクされていない**。`GITHUB_TOKEN` はリポジトリにリンクされたパッケージにしか write できない。
+
+確認方法:
+```bash
+gh api /user/packages/container/<package-name> --jq '{repository: .repository.full_name}'
+# repository: null → リンクされていない
+```
+
+### 解決策
+
+1. https://github.com/users/<user>/packages/container/package/<name> にアクセス
+2. **Package settings** → **Manage Actions access**
+3. **Add Repository** → 対象リポジトリを追加
+4. Role を **Write** に設定
+
+初回の push は手動（`podman push` 等）で行い、パッケージが作成された後にリポジトリリンクを設定する。
+
+**注意**: リポジトリの Settings → Actions → General → **Workflow permissions** も **Read and write permissions** にする必要がある:
+
+```bash
+gh api --method PUT /repos/owner/repo/actions/permissions/workflow \
+  -f default_workflow_permissions="write" \
+  -F can_approve_pull_request_reviews=true
+```
+
+## 問題6: push したイメージが K8s から pull できない
 
 ### 症状
 
