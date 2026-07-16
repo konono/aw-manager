@@ -134,7 +134,7 @@ func (m *Manager) EnsurePod(ctx context.Context, key session.SessionKey) (string
 
 	if sess != nil {
 		pod, err := m.clientset.CoreV1().Pods(namespace).Get(ctx, sess.PodName, metav1.GetOptions{})
-		if err == nil && pod.Status.Phase == corev1.PodRunning && isPodReady(pod) {
+		if err == nil && pod.Status.Phase == corev1.PodRunning && isPodReady(pod) && pod.DeletionTimestamp == nil {
 			m.logger.Info("reusing existing pod", "user", key.UserID, "channel", key.ChannelID, "pod", sess.PodName)
 			if err := m.sessions.TouchSession(ctx, key); err != nil {
 				m.logger.Warn("failed to touch session", "error", err)
@@ -220,7 +220,7 @@ func (m *Manager) findPodByInstance(ctx context.Context, namespace, instanceName
 	}
 
 	for _, pod := range pods.Items {
-		if pod.Status.Phase == corev1.PodRunning && isPodReady(&pod) {
+		if pod.Status.Phase == corev1.PodRunning && isPodReady(&pod) && pod.DeletionTimestamp == nil {
 			return pod.Name, nil
 		}
 	}
@@ -375,7 +375,6 @@ func (m *Manager) DeleteInstance(ctx context.Context, key session.SessionKey) er
 		return err
 	}
 
-	m.keyLocks.Delete(key)
 	m.syncPodsActiveGauge()
 	return nil
 }
