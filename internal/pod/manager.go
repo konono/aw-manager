@@ -378,6 +378,7 @@ func (m *Manager) DeleteInstance(ctx context.Context, key session.SessionKey) er
 		return err
 	}
 
+	// Do not delete from keyLocks: callers may still hold the mutex (e.g. cmdClear).
 	m.syncPodsActiveGauge()
 	return nil
 }
