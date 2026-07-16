@@ -105,7 +105,7 @@ func (m *Manager) syncPodsActiveGauge() {
 	}
 	var count float64
 	for _, pod := range pods.Items {
-		if pod.Status.Phase == corev1.PodRunning && isPodReady(&pod) {
+		if isPodUsable(&pod) {
 			count++
 		}
 	}
@@ -134,7 +134,7 @@ func (m *Manager) EnsurePod(ctx context.Context, key session.SessionKey) (string
 
 	if sess != nil {
 		pod, err := m.clientset.CoreV1().Pods(namespace).Get(ctx, sess.PodName, metav1.GetOptions{})
-		if err == nil && pod.Status.Phase == corev1.PodRunning && isPodReady(pod) {
+		if err == nil && isPodUsable(pod) {
 			m.logger.Info("reusing existing pod", "user", key.UserID, "channel", key.ChannelID, "pod", sess.PodName)
 			if err := m.sessions.TouchSession(ctx, key); err != nil {
 				m.logger.Warn("failed to touch session", "error", err)
@@ -203,6 +203,9 @@ func (m *Manager) hasNonTerminalPod(ctx context.Context, namespace, instanceName
 		return false, err
 	}
 	for _, pod := range pods.Items {
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
 		if pod.Status.Phase != corev1.PodFailed && pod.Status.Phase != corev1.PodSucceeded {
 			return true, nil
 		}
@@ -220,7 +223,7 @@ func (m *Manager) findPodByInstance(ctx context.Context, namespace, instanceName
 	}
 
 	for _, pod := range pods.Items {
-		if pod.Status.Phase == corev1.PodRunning && isPodReady(&pod) {
+		if isPodUsable(&pod) {
 			return pod.Name, nil
 		}
 	}
@@ -275,7 +278,7 @@ func (m *Manager) waitForPodReady(ctx context.Context, namespace, instanceName s
 		}
 
 		for _, pod := range pods.Items {
-			if pod.Status.Phase == corev1.PodRunning && isPodReady(&pod) {
+			if isPodUsable(&pod) {
 				return pod.Name, nil
 			}
 			if pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded {
@@ -375,7 +378,7 @@ func (m *Manager) DeleteInstance(ctx context.Context, key session.SessionKey) er
 		return err
 	}
 
-	m.keyLocks.Delete(key)
+	// Do not delete from keyLocks: callers may still hold the mutex (e.g. cmdClear).
 	m.syncPodsActiveGauge()
 	return nil
 }
@@ -511,6 +514,10 @@ func isPodReady(pod *corev1.Pod) bool {
 		}
 	}
 	return false
+}
+
+func isPodUsable(pod *corev1.Pod) bool {
+	return pod.Status.Phase == corev1.PodRunning && isPodReady(pod) && pod.DeletionTimestamp == nil
 }
 
 func isPodUnhealthy(pod *corev1.Pod) bool {
